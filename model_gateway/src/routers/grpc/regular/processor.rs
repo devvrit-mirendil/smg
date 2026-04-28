@@ -11,7 +11,7 @@ use llm_tokenizer::{
 };
 use openai_protocol::{
     chat::{ChatChoice, ChatCompletionMessage, ChatCompletionRequest, ChatCompletionResponse},
-    common::{FunctionCallResponse, ToolCall, ToolChoice, ToolChoiceValue, Usage},
+    common::{FunctionCallResponse, ResponseFormat, ToolCall, ToolChoice, ToolChoiceValue, Usage},
     completion::{CompletionChoice, CompletionRequest, CompletionResponse},
     generate::{GenerateMetaInfo, GenerateRequest, GenerateResponse},
     messages::{self, CreateMessageRequest, Message},
@@ -96,15 +96,14 @@ impl ResponseProcessor {
         let mut reasoning_text: Option<String> = None;
         let mut processed_text = final_text;
 
-        let output_is_constrained = !original_request.separate_reasoning
-            && utils::has_constrained_output(
-                original_request.tool_choice.as_ref(),
-                original_request.response_format.as_ref(),
-            );
+        let has_structured_output = matches!(
+            original_request.response_format,
+            Some(ResponseFormat::JsonObject | ResponseFormat::JsonSchema { .. })
+        );
 
         if original_request.separate_reasoning
             && reasoning_parser_available
-            && !output_is_constrained
+            && !has_structured_output
         {
             let pooled_parser = utils::get_reasoning_parser(
                 &self.reasoning_parser_factory,
@@ -165,7 +164,27 @@ impl ResponseProcessor {
                 }
             };
 
-            if used_json_schema {
+            let output_is_constrained = utils::has_constrained_output(
+                original_request.tool_choice.as_ref(),
+                original_request.response_format.as_ref(),
+            );
+            if self.configured_tool_parser.is_some()
+                && tool_parser_available
+                && !output_is_constrained
+            {
+                // Configured parser for native tool call tokens (auto/required modes)
+                (tool_calls, processed_text) = self
+                    .parse_tool_calls(
+                        &processed_text,
+                        &original_request.model,
+                        history_tool_calls_count,
+                        original_request.tools.as_deref(),
+                    )
+                    .await;
+            }
+
+            if tool_calls.is_none() && used_json_schema {
+                // Constrained decoding output: pure JSON wrapped as a tool call
                 (tool_calls, processed_text) = utils::parse_json_schema_response(
                     &processed_text,
                     original_request.tool_choice.as_ref(),
@@ -221,7 +240,73 @@ impl ResponseProcessor {
             utils::convert_proto_to_openai_logprobs(proto_logprobs, tokenizer)
         });
 
-        // Step 5: Build ChatCompletionMessage (proper response message type)
+        // Strip leaked chatml tokens only when a model-specific parser is configured
+        if self.configured_tool_parser.is_some() || self.configured_reasoning_parser.is_some() {
+            for token in [
+                "<|im_end|>",
+                "<|im_start|>",
+                "<|im_user|>",
+                "<|im_assistant|>",
+                "<|im_system|>",
+                "<|im_middle|>",
+            ] {
+                processed_text = processed_text.replace(token, "");
+            }
+            processed_text = processed_text.trim().to_string();
+        }
+
+        let is_json_response = matches!(
+            &original_request.response_format,
+            Some(ResponseFormat::JsonObject) | Some(ResponseFormat::JsonSchema { .. })
+        );
+        if is_json_response {
+            if processed_text.starts_with("```json") || processed_text.starts_with("```JSON") {
+                if let Some(start) = processed_text.find('\n') {
+                    let inner = &processed_text[start + 1..];
+                    if let Some(end) = inner.rfind("```") {
+                        processed_text = inner[..end].trim().to_string();
+                    }
+                }
+            }
+
+            if processed_text.starts_with('{') {
+                let mut depth = 0i32;
+                let mut in_string = false;
+                let mut escape = false;
+                let mut json_end = None;
+                for (i, ch) in processed_text.char_indices() {
+                    if escape {
+                        escape = false;
+                        continue;
+                    }
+                    if ch == '\\' && in_string {
+                        escape = true;
+                        continue;
+                    }
+                    if ch == '"' {
+                        in_string = !in_string;
+                        continue;
+                    }
+                    if in_string {
+                        continue;
+                    }
+                    if ch == '{' {
+                        depth += 1;
+                    } else if ch == '}' {
+                        depth -= 1;
+                        if depth == 0 {
+                            json_end = Some(i + 1);
+                            break;
+                        }
+                    }
+                }
+                if let Some(end) = json_end {
+                    processed_text = processed_text[..end].to_string();
+                }
+            }
+        }
+
+        // Build ChatCompletionMessage (proper response message type)
         let chat_message = ChatCompletionMessage {
             role: "assistant".to_string(),
             content: if processed_text.is_empty() {
@@ -260,8 +345,14 @@ impl ResponseProcessor {
 
         let history_tool_calls_count = utils::get_history_tool_calls_count(&chat_request);
 
+        let has_structured_output = matches!(
+            chat_request.response_format,
+            Some(ResponseFormat::JsonObject | ResponseFormat::JsonSchema { .. })
+        );
+
         // Check parser availability once upfront (not per choice)
         let reasoning_parser_available = chat_request.separate_reasoning
+            && !has_structured_output
             && utils::check_reasoning_parser_availability(
                 &self.reasoning_parser_factory,
                 self.configured_reasoning_parser.as_deref(),
