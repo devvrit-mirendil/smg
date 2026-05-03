@@ -213,6 +213,16 @@ async fn health_generate(State(state): State<Arc<AppState>>, _req: Request) -> R
     }
 
     let model_id = healthy[0].model_id().to_string();
+
+    // api_port == 0 means no real server is bound (test mode); skip the HTTP probe.
+    if state.api_port == 0 {
+        return (
+            StatusCode::OK,
+            format!("OK - {} workers healthy (probe skipped)", healthy.len()),
+        )
+            .into_response();
+    }
+
     let probe_url = format!("http://127.0.0.1:{}/v1/chat/completions", state.api_port);
     let probe_body = serde_json::json!({
         "model": model_id,
