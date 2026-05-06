@@ -21,13 +21,19 @@ use crate::routers::{
 pub(crate) struct ChatRequestBuildingStage {
     inject_pd_metadata: bool,
     enable_message_hash: bool,
+    log_request_params: bool,
 }
 
 impl ChatRequestBuildingStage {
-    pub fn new(inject_pd_metadata: bool, enable_message_hash: bool) -> Self {
+    pub fn new(
+        inject_pd_metadata: bool,
+        enable_message_hash: bool,
+        log_request_params: bool,
+    ) -> Self {
         Self {
             inject_pd_metadata,
             enable_message_hash,
+            log_request_params,
         }
     }
 }
@@ -84,6 +90,10 @@ impl PipelineStage for ChatRequestBuildingStage {
             .unwrap_or_else(|| format!("chatcmpl-{}", Uuid::now_v7()));
         if user_supplied {
             info!(target: "smg::request", request_id = %request_id, "Using user-supplied request ID");
+        }
+
+        if self.log_request_params {
+            helpers::log_chat_request_params(&request_id, &chat_request);
         }
 
         let message_hashes = if self.enable_message_hash {

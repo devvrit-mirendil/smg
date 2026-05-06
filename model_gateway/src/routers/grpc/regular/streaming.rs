@@ -204,7 +204,7 @@ impl StreamingProcessor {
         // Extract request parameters
         let has_structured_output = matches!(
             original_request.response_format,
-            Some(ResponseFormat::JsonObject { .. } | ResponseFormat::JsonSchema { .. })
+            Some(ResponseFormat::JsonObject | ResponseFormat::JsonSchema { .. })
         );
         let separate_reasoning = original_request.separate_reasoning;
         let tool_choice = &original_request.tool_choice;
@@ -610,12 +610,11 @@ impl StreamingProcessor {
                 if !content_emitted.get(index).copied().unwrap_or(false)
                     && !buffer.trim().is_empty()
                 {
-                    let recovery_chunk =
-                        ChatCompletionStreamResponse::builder(request_id, model)
-                            .created(created)
-                            .add_choice_content(*index, "assistant", buffer.clone())
-                            .maybe_system_fingerprint(system_fingerprint)
-                            .build();
+                    let recovery_chunk = ChatCompletionStreamResponse::builder(request_id, model)
+                        .created(created)
+                        .add_choice_content(*index, "assistant", buffer.clone())
+                        .maybe_system_fingerprint(system_fingerprint)
+                        .build();
                     Self::format_sse_chunk_into(&mut sse_buffer, &recovery_chunk);
                     tx.send(Ok(Bytes::from(sse_buffer.clone())))
                         .map_err(|_| "Failed to send recovery content chunk".to_string())?;
