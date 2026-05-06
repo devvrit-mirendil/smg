@@ -281,12 +281,28 @@ impl HarmonyBuilder {
 
         let selection_text = self.extract_selection_text(&all_messages);
 
-        // Get stop tokens for Harmony assistant actions (<|return|> and <|call|>)
+        // Stop only on <|return|> (EndMessageDoneSampling).
+        //
+        // openai-harmony's stop_tokens_for_assistant_actions() also includes
+        // <|call|> (EndMessageAssistantToTool). For gpt-oss, the model emits
+        // <|call|> after EVERY function-call message — including the
+        // intermediate ones in a parallel-tool-call sequence — so treating
+        // <|call|> as a stop terminates generation after the first call and
+        // silently drops subsequent parallel calls. This matches sglang's
+        // HTTP /v1/chat/completions path, which only relies on <|return|>
+        // and lets its post-parser split the buffered output on <|call|>.
+        let call_stop_ids: HashSet<u32> = self
+            .encoding
+            .tokenizer()
+            .encode_with_special_tokens("<|call|>")
+            .into_iter()
+            .collect();
         let stop_token_ids: Vec<u32> = self
             .encoding
             .stop_tokens_for_assistant_actions()
             .into_iter()
             .flat_map(|set| set.into_iter())
+            .filter(|t| !call_stop_ids.contains(t))
             .collect();
 
         Ok(HarmonyBuildOutput {
@@ -323,12 +339,21 @@ impl HarmonyBuilder {
 
         let selection_text = self.extract_selection_text(&all_messages);
 
-        // Get stop tokens for Harmony assistant actions (<|return|> and <|call|>)
+        // Stop only on <|return|>; exclude <|call|> so parallel tool calls
+        // aren't truncated to the first call. See build_from_chat for the
+        // full rationale.
+        let call_stop_ids: HashSet<u32> = self
+            .encoding
+            .tokenizer()
+            .encode_with_special_tokens("<|call|>")
+            .into_iter()
+            .collect();
         let stop_token_ids: Vec<u32> = self
             .encoding
             .stop_tokens_for_assistant_actions()
             .into_iter()
             .flat_map(|set| set.into_iter())
+            .filter(|t| !call_stop_ids.contains(t))
             .collect();
 
         // Decode tokens to see what the model actually receives

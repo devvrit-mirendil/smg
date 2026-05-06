@@ -23,6 +23,12 @@ fn get_harmony_encoding() -> &'static HarmonyEncoding {
 pub(crate) struct HarmonyParserAdapter {
     parser: StreamableParser,
     prev_recipient: Option<String>,
+    /// Index of the in-progress tool call relative to the stream so far —
+    /// equal to the count of *finalized* commentary/functions messages at
+    /// the moment the in-progress call started. Compared against the live
+    /// count to detect transitions between parallel calls to the same
+    /// function (where `prev_recipient` would otherwise stay equal).
+    prev_call_index: Option<usize>,
     reasoning_token_count: u32,
 }
 
@@ -36,6 +42,7 @@ impl HarmonyParserAdapter {
         Ok(Self {
             parser,
             prev_recipient: None,
+            prev_call_index: None,
             reasoning_token_count: 0,
         })
     }
@@ -233,11 +240,23 @@ impl HarmonyParserAdapter {
     ) -> Result<HarmonyChannelOutput, String> {
         let mut reasoning_token_count = 0u32;
 
-        // Feed all tokens to the parser
+        // Feed tokens, skipping any the parser rejects. After our stop-token
+        // change (only <|return|> stops, not <|call|>), gpt-oss can emit
+        // transient malformed tokens at message boundaries (e.g. a stray
+        // <|call|> where <|start|> is expected). The openai-harmony state
+        // machine leaves its state unchanged on a rejected token, so we can
+        // safely continue and resume on the next valid token — preserving
+        // any subsequent parallel tool calls. If we instead `break` on the
+        // first error, we silently drop later valid messages.
         for &token_id in output_ids {
-            self.parser
-                .process(token_id)
-                .map_err(|e| format!("Failed to process token {token_id}: {e}"))?;
+            if let Err(e) = self.parser.process(token_id) {
+                tracing::warn!(
+                    token_id,
+                    error = %e,
+                    "Harmony parser rejected token; skipping and continuing"
+                );
+                continue;
+            }
 
             // Count reasoning tokens (analysis + commentary channels)
             if let Some(channel) = self.parser.current_channel() {
@@ -255,6 +274,44 @@ impl HarmonyParserAdapter {
 
         // Check for incomplete content in parser state
         Self::handle_incomplete_content(&self.parser, &mut analysis, &mut final_text);
+
+        // Constrained-decoding fallback: when the model is forced to emit a
+        // pattern that doesn't include any harmony envelope (e.g.
+        // `response_format: { type: "regex" }` produces raw text like
+        // "negative<|return|>"), the harmony parser rejects every text
+        // token because it's waiting for a `<|channel|>` marker that never
+        // arrives. The result is empty final_text/analysis/commentary even
+        // though the worker generated valid output. Detect that case and
+        // decode the raw tokens as plain text, stripping known harmony
+        // stop tokens.
+        if final_text.is_empty()
+            && analysis.is_none()
+            && commentary.is_none()
+            && !output_ids.is_empty()
+        {
+            let encoding = get_harmony_encoding();
+            let stop_set: std::collections::HashSet<u32> = encoding
+                .stop_tokens()
+                .into_iter()
+                .flat_map(|set| set.into_iter())
+                .collect();
+            let visible: Vec<u32> = output_ids
+                .iter()
+                .copied()
+                .filter(|t| !stop_set.contains(t))
+                .collect();
+            if !visible.is_empty() {
+                if let Ok(text) = encoding.tokenizer().decode_utf8(&visible) {
+                    if !text.is_empty() {
+                        tracing::debug!(
+                            tokens = visible.len(),
+                            "Harmony parser produced no content; falling back to plain-text decode of raw output (likely constrained decoding without envelope)"
+                        );
+                        final_text = text;
+                    }
+                }
+            }
+        }
 
         // Determine finish reason: override to "tool_calls" if commentary has tool calls
         let final_finish_reason = if commentary.is_some() {
@@ -354,11 +411,20 @@ impl HarmonyParserAdapter {
         // Accumulate delta text for commentary channel
         let mut accumulated_delta = String::new();
 
-        // Process each token
+        // Process each token. See parse_complete for why we tolerate
+        // process() errors instead of propagating: gpt-oss can emit
+        // transient malformed tokens at message boundaries; the parser
+        // leaves its state unchanged on rejection, so skipping the bad
+        // token and continuing preserves later valid messages.
         for &token_id in chunk_ids {
-            self.parser
-                .process(token_id)
-                .map_err(|e| format!("Failed to process token {token_id}: {e}"))?;
+            if let Err(e) = self.parser.process(token_id) {
+                tracing::warn!(
+                    token_id,
+                    error = %e,
+                    "Harmony parser rejected token in stream; skipping and continuing"
+                );
+                continue;
+            }
 
             // Count reasoning tokens (analysis + commentary channels)
             if let Some(channel) = self.parser.current_channel() {
@@ -409,10 +475,18 @@ impl HarmonyParserAdapter {
                         })
                         .count();
 
-                    // Check if recipient changed (new tool call)
-                    let recipient_changed = self.prev_recipient.as_deref() != Some(&cur_recipient);
+                    // Detect a new tool call. The recipient string alone is
+                    // insufficient: parallel calls to the SAME function (e.g.
+                    // getCurrentWeather for NY, SF, Chicago) keep
+                    // `cur_recipient == prev_recipient`, so we'd never emit
+                    // id/name for the 2nd+ calls. Compare against the index
+                    // of completed messages too — when a call finalizes, the
+                    // count of completed commentary/functions messages
+                    // increments, marking the boundary to a new call.
+                    let is_new_call = self.prev_recipient.as_deref() != Some(&cur_recipient)
+                        || self.prev_call_index != Some(base_index);
 
-                    if recipient_changed {
+                    if is_new_call {
                         // NEW tool call: emit name + id
                         let call_id = format!("call_{}", Uuid::now_v7());
 
@@ -425,8 +499,9 @@ impl HarmonyParserAdapter {
                             }),
                         });
 
-                        // Update prev_recipient
+                        // Update prev_recipient and prev_call_index
                         self.prev_recipient = Some(cur_recipient);
+                        self.prev_call_index = Some(base_index);
                     } else if !accumulated_delta.is_empty() {
                         // CONTINUING tool call: emit arguments delta
                         commentary_delta = Some(super::types::ToolCallDelta {
