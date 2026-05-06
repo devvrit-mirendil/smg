@@ -373,6 +373,11 @@ impl RouterConfigBuilder {
         self
     }
 
+    pub fn log_request_params(mut self, enable: bool) -> Self {
+        self.config.log_request_params = enable;
+        self
+    }
+
     // ==================== WASM ====================
 
     pub fn enable_wasm(mut self, enable: bool) -> Self {

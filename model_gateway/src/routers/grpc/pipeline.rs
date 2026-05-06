@@ -124,6 +124,7 @@ impl RequestPipeline {
         configured_tool_parser: Option<String>,
         configured_reasoning_parser: Option<String>,
         enable_message_hash: bool,
+        log_request_params: bool,
         last_token_time: Arc<AtomicU64>,
     ) -> Self {
         let processor = processor::ResponseProcessor::new(
@@ -153,6 +154,7 @@ impl RequestPipeline {
             Box::new(ChatGenerateRequestBuildingStage::new(
                 false,
                 enable_message_hash,
+                log_request_params,
             )),
             Box::new(DispatchMetadataStage),
             Box::new(RequestExecutionStage::new(ExecutionMode::Single)),
@@ -169,6 +171,10 @@ impl RequestPipeline {
     }
 
     /// Create a Harmony (single-worker) pipeline for Harmony-capable models
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "all params are distinct required dependencies"
+    )]
     pub fn new_harmony(
         worker_registry: Arc<WorkerRegistry>,
         policy_registry: Arc<PolicyRegistry>,
@@ -177,6 +183,7 @@ impl RequestPipeline {
         _configured_tool_parser: Option<String>,
         _configured_reasoning_parser: Option<String>,
         enable_message_hash: bool,
+        log_request_params: bool,
     ) -> Self {
         let stages: Vec<Box<dyn PipelineStage>> = vec![
             Box::new(harmony::stages::HarmonyPreparationStage::new()),
@@ -189,6 +196,7 @@ impl RequestPipeline {
             Box::new(harmony::stages::HarmonyRequestBuildingStage::new(
                 false,
                 enable_message_hash,
+                log_request_params,
             )),
             Box::new(DispatchMetadataStage),
             Box::new(RequestExecutionStage::new(ExecutionMode::Single)),
@@ -203,6 +211,10 @@ impl RequestPipeline {
 
     /// Create a Harmony PD (prefill-decode) pipeline
     #[expect(dead_code)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "all params are distinct required dependencies"
+    )]
     pub fn new_harmony_pd(
         worker_registry: Arc<WorkerRegistry>,
         policy_registry: Arc<PolicyRegistry>,
@@ -211,6 +223,7 @@ impl RequestPipeline {
         _configured_tool_parser: Option<String>,
         _configured_reasoning_parser: Option<String>,
         enable_message_hash: bool,
+        log_request_params: bool,
     ) -> Self {
         let stages: Vec<Box<dyn PipelineStage>> = vec![
             Box::new(harmony::stages::HarmonyPreparationStage::new()),
@@ -223,6 +236,7 @@ impl RequestPipeline {
             Box::new(harmony::stages::HarmonyRequestBuildingStage::new(
                 true,
                 enable_message_hash,
+                log_request_params,
             )),
             Box::new(DispatchMetadataStage),
             Box::new(RequestExecutionStage::new(ExecutionMode::DualDispatch)),
@@ -248,6 +262,7 @@ impl RequestPipeline {
         configured_tool_parser: Option<String>,
         configured_reasoning_parser: Option<String>,
         enable_message_hash: bool,
+        log_request_params: bool,
         last_token_time: Arc<AtomicU64>,
     ) -> Self {
         let processor = processor::ResponseProcessor::new(
@@ -277,6 +292,7 @@ impl RequestPipeline {
             Box::new(ChatGenerateRequestBuildingStage::new(
                 true,
                 enable_message_hash,
+                log_request_params,
             )),
             Box::new(DispatchMetadataStage),
             Box::new(RequestExecutionStage::new(ExecutionMode::DualDispatch)),
@@ -362,6 +378,7 @@ impl RequestPipeline {
         configured_tool_parser: Option<String>,
         configured_reasoning_parser: Option<String>,
         enable_message_hash: bool,
+        log_request_params: bool,
         last_token_time: Arc<AtomicU64>,
     ) -> Self {
         let processor = processor::ResponseProcessor::new(
@@ -388,7 +405,11 @@ impl RequestPipeline {
                 WorkerSelectionMode::Regular,
             )),
             Box::new(ClientAcquisitionStage),
-            Box::new(MessageRequestBuildingStage::new(false, enable_message_hash)),
+            Box::new(MessageRequestBuildingStage::new(
+                false,
+                enable_message_hash,
+                log_request_params,
+            )),
             Box::new(DispatchMetadataStage),
             Box::new(RequestExecutionStage::new(ExecutionMode::Single)),
             Box::new(MessageResponseProcessingStage::new(
@@ -416,6 +437,7 @@ impl RequestPipeline {
         configured_tool_parser: Option<String>,
         configured_reasoning_parser: Option<String>,
         enable_message_hash: bool,
+        log_request_params: bool,
         last_token_time: Arc<AtomicU64>,
     ) -> Self {
         let processor = processor::ResponseProcessor::new(
@@ -442,7 +464,11 @@ impl RequestPipeline {
                 WorkerSelectionMode::PrefillDecode,
             )),
             Box::new(ClientAcquisitionStage),
-            Box::new(MessageRequestBuildingStage::new(true, enable_message_hash)),
+            Box::new(MessageRequestBuildingStage::new(
+                true,
+                enable_message_hash,
+                log_request_params,
+            )),
             Box::new(DispatchMetadataStage),
             Box::new(RequestExecutionStage::new(ExecutionMode::DualDispatch)),
             Box::new(MessageResponseProcessingStage::new(
@@ -466,6 +492,7 @@ impl RequestPipeline {
         worker_registry: Arc<WorkerRegistry>,
         policy_registry: Arc<PolicyRegistry>,
         enable_message_hash: bool,
+        log_request_params: bool,
         last_token_time: Arc<AtomicU64>,
     ) -> Self {
         let processor = processor::ResponseProcessor::new(
@@ -495,6 +522,7 @@ impl RequestPipeline {
             Box::new(CompletionRequestBuildingStage::new(
                 false,
                 enable_message_hash,
+                log_request_params,
             )),
             Box::new(DispatchMetadataStage),
             Box::new(RequestExecutionStage::new(ExecutionMode::Single)),
@@ -515,6 +543,7 @@ impl RequestPipeline {
         worker_registry: Arc<WorkerRegistry>,
         policy_registry: Arc<PolicyRegistry>,
         enable_message_hash: bool,
+        log_request_params: bool,
         last_token_time: Arc<AtomicU64>,
     ) -> Self {
         let processor = processor::ResponseProcessor::new(
@@ -544,6 +573,7 @@ impl RequestPipeline {
             Box::new(CompletionRequestBuildingStage::new(
                 true,
                 enable_message_hash,
+                log_request_params,
             )),
             Box::new(DispatchMetadataStage),
             Box::new(RequestExecutionStage::new(ExecutionMode::DualDispatch)),
