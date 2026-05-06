@@ -22,14 +22,20 @@ use crate::routers::{
 pub(crate) struct HarmonyRequestBuildingStage {
     inject_pd_metadata: bool,
     enable_message_hash: bool,
+    log_request_params: bool,
 }
 
 impl HarmonyRequestBuildingStage {
     /// Create a new Harmony request building stage
-    pub fn new(inject_pd_metadata: bool, enable_message_hash: bool) -> Self {
+    pub fn new(
+        inject_pd_metadata: bool,
+        enable_message_hash: bool,
+        log_request_params: bool,
+    ) -> Self {
         Self {
             inject_pd_metadata,
             enable_message_hash,
+            log_request_params,
         }
     }
 }
@@ -110,6 +116,12 @@ impl PipelineStage for HarmonyRequestBuildingStage {
                 ));
             }
         };
+
+        if self.log_request_params {
+            if let RequestType::Chat(req) = &ctx.input.request_type {
+                helpers::log_chat_request_params(&request_id, req);
+            }
+        }
 
         let message_hashes = if self.enable_message_hash {
             if let RequestType::Chat(req) = &ctx.input.request_type {

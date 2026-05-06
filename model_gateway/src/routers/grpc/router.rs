@@ -89,6 +89,7 @@ impl GrpcRouter {
         });
 
         let enable_message_hash = ctx.router_config.enable_message_hash;
+        let log_request_params = ctx.router_config.log_request_params;
 
         // Create regular pipeline
         let pipeline = RequestPipeline::new_regular(
@@ -99,6 +100,7 @@ impl GrpcRouter {
             ctx.configured_tool_parser.clone(),
             ctx.configured_reasoning_parser.clone(),
             enable_message_hash,
+            log_request_params,
             ctx.last_token_time.clone(),
         );
 
@@ -111,6 +113,7 @@ impl GrpcRouter {
             ctx.configured_tool_parser.clone(),
             ctx.configured_reasoning_parser.clone(),
             enable_message_hash,
+            log_request_params,
         );
 
         // Create Embedding pipeline
@@ -130,6 +133,7 @@ impl GrpcRouter {
             ctx.configured_tool_parser.clone(),
             ctx.configured_reasoning_parser.clone(),
             enable_message_hash,
+            log_request_params,
             ctx.last_token_time.clone(),
         );
 
@@ -138,6 +142,7 @@ impl GrpcRouter {
             worker_registry.clone(),
             _policy_registry.clone(),
             enable_message_hash,
+            log_request_params,
             ctx.last_token_time.clone(),
         );
 

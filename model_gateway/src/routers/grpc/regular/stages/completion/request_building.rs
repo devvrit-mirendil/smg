@@ -24,11 +24,19 @@ use crate::routers::{
 
 pub(crate) struct CompletionRequestBuildingStage {
     inject_pd_metadata: bool,
+    log_request_params: bool,
 }
 
 impl CompletionRequestBuildingStage {
-    pub fn new(inject_pd_metadata: bool, _enable_message_hash: bool) -> Self {
-        Self { inject_pd_metadata }
+    pub fn new(
+        inject_pd_metadata: bool,
+        _enable_message_hash: bool,
+        log_request_params: bool,
+    ) -> Self {
+        Self {
+            inject_pd_metadata,
+            log_request_params,
+        }
     }
 }
 
@@ -68,6 +76,10 @@ impl PipelineStage for CompletionRequestBuildingStage {
             .unwrap_or_else(|| format!("cmpl_{}", Uuid::now_v7()));
         if user_supplied {
             info!(target: "smg::request", request_id = %request_id, "Using user-supplied request ID");
+        }
+
+        if self.log_request_params {
+            helpers::log_completion_request_params(&request_id, &completion_request);
         }
 
         let mut proto_request = builder_client

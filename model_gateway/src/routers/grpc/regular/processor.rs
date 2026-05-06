@@ -136,7 +136,9 @@ impl ResponseProcessor {
                         && processed_text.trim().is_empty()
                         && reasoning_text.is_some()
                     {
-                        processed_text = reasoning_text.take().unwrap();
+                        if let Some(text) = reasoning_text.take() {
+                            processed_text = text;
+                        }
                     }
                 }
                 Err(e) => {

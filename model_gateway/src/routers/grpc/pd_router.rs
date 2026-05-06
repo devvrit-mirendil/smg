@@ -77,6 +77,7 @@ impl GrpcPDRouter {
         });
 
         let enable_message_hash = ctx.router_config.enable_message_hash;
+        let log_request_params = ctx.router_config.log_request_params;
 
         // Create PD pipeline
         let pipeline = RequestPipeline::new_pd(
@@ -87,6 +88,7 @@ impl GrpcPDRouter {
             ctx.configured_tool_parser.clone(),
             ctx.configured_reasoning_parser.clone(),
             enable_message_hash,
+            log_request_params,
             ctx.last_token_time.clone(),
         );
 
@@ -99,6 +101,7 @@ impl GrpcPDRouter {
             ctx.configured_tool_parser.clone(),
             ctx.configured_reasoning_parser.clone(),
             enable_message_hash,
+            log_request_params,
             ctx.last_token_time.clone(),
         );
 
@@ -107,6 +110,7 @@ impl GrpcPDRouter {
             worker_registry.clone(),
             policy_registry.clone(),
             enable_message_hash,
+            log_request_params,
             ctx.last_token_time.clone(),
         );
 
