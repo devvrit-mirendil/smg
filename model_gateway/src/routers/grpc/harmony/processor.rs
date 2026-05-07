@@ -98,10 +98,21 @@ impl HarmonyResponseProcessor {
                 None
             };
 
+            // When tool calls are present, suppress final-channel text.
+            // This matches the OpenAI spec (content is null when
+            // finish_reason=tool_calls) and prevents the model from
+            // seeing stale pre-tool prose in the next turn's history,
+            // which causes it to paraphrase tool results or over-call.
+            let has_tool_calls = parsed
+                .commentary
+                .as_ref()
+                .is_some_and(|calls| !calls.is_empty());
+
             // Build response message (assistant)
             let message = ChatCompletionMessage {
                 role: "assistant".to_string(),
-                content: (!parsed.final_text.is_empty()).then_some(parsed.final_text),
+                content: (!has_tool_calls && !parsed.final_text.is_empty())
+                    .then_some(parsed.final_text),
                 tool_calls: parsed.commentary,
                 reasoning_content: parsed.analysis,
             };
