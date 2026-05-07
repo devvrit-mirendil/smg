@@ -314,6 +314,7 @@ impl TrtllmServiceClient {
             cache_salt_id: None,
             arrival_time: None,
             include_stop_token_in_output: false,
+            message_hashes: vec![],
         };
 
         Ok(grpc_request)
@@ -397,6 +398,7 @@ impl TrtllmServiceClient {
             cache_salt_id: None,
             arrival_time: None,
             include_stop_token_in_output: false,
+            message_hashes: vec![],
         };
 
         Ok(grpc_request)
@@ -456,6 +458,7 @@ impl TrtllmServiceClient {
             lookahead_config: None,
             cache_salt_id: None,
             arrival_time: None,
+            message_hashes: vec![],
             include_stop_token_in_output: false,
         };
 
@@ -695,6 +698,7 @@ impl TrtllmServiceClient {
             disaggregated_params: None,
             lookahead_config: None,
             cache_salt_id: None,
+            message_hashes: vec![],
             arrival_time: None,
             include_stop_token_in_output: false,
         };
@@ -785,6 +789,7 @@ impl TrtllmServiceClient {
             kv_cache_retention: None,
             disaggregated_params: None,
             lookahead_config: None,
+            message_hashes: vec![],
             cache_salt_id: None,
             arrival_time: None,
             include_stop_token_in_output: body.no_stop_trim,
