@@ -138,7 +138,6 @@ pub fn create_test_app_with_context(
     let router_config = &app_context.router_config;
 
     // Create AppState with the test router and context.
-    // api_port = 0 signals test mode: health_generate skips the HTTP probe.
     let app_state = Arc::new(AppState {
         router,
         context: app_context.clone(),
