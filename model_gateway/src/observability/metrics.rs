@@ -351,10 +351,26 @@ pub fn start_prometheus(config: PrometheusConfig) -> PrometheusHandle {
         ]
     });
 
+    // TTFT and TPOT metrics end with `_seconds` (not `duration_seconds`)
+    // and need finer sub-second buckets suited to per-token timing.
+    // Without an explicit bucket matcher they fall through to the
+    // default rolling summary whose quantiles decay to 0 after ~60s
+    // of inactivity.
+    let token_timing_matcher = Matcher::Suffix(String::from("tpot_seconds"));
+    let ttft_matcher = Matcher::Suffix(String::from("ttft_seconds"));
+    let token_timing_buckets: Vec<f64> = vec![
+        0.001, 0.0025, 0.005, 0.0075, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0,
+        10.0, 30.0,
+    ];
+
     PrometheusBuilder::new()
         .upkeep_timeout(Duration::from_secs(UPKEEP_INTERVAL_SECS))
         .set_buckets_for_metric(duration_matcher, &duration_bucket)
         .expect("failed to set duration bucket")
+        .set_buckets_for_metric(ttft_matcher, &token_timing_buckets)
+        .expect("failed to set TTFT bucket")
+        .set_buckets_for_metric(token_timing_matcher, &token_timing_buckets)
+        .expect("failed to set TPOT bucket")
         .install_recorder()
         .expect("failed to install Prometheus recorder")
 }
