@@ -20,13 +20,16 @@ use reasoning_parser::ParserFactory as ReasoningParserFactory;
 use tool_parser::ParserFactory as ToolParserFactory;
 use tracing::{error, warn};
 
-use crate::routers::{
-    error,
-    grpc::{
-        common::{response_collection, response_formatting},
-        context::{DispatchMetadata, ExecutionResult},
-        proto_wrapper::ProtoGenerateComplete,
-        utils,
+use crate::{
+    observability::metrics::{metrics_labels, Metrics},
+    routers::{
+        error,
+        grpc::{
+            common::{response_collection, response_formatting},
+            context::{DispatchMetadata, ExecutionResult},
+            proto_wrapper::ProtoGenerateComplete,
+            utils,
+        },
     },
 };
 
@@ -301,6 +304,16 @@ impl ResponseProcessor {
 
         // Build usage
         let usage = response_formatting::build_usage(&all_responses);
+
+        // Record thinking metric per choice
+        for choice in &choices {
+            let has_thinking = choice.message.reasoning_content.is_some();
+            Metrics::record_thinking_response(
+                &dispatch.model,
+                metrics_labels::ENDPOINT_CHAT,
+                has_thinking,
+            );
+        }
 
         // Build final ChatCompletionResponse
         Ok(
@@ -749,6 +762,16 @@ impl ResponseProcessor {
             server_tool_use: None,
             service_tier: None,
         };
+
+        // Record thinking metric
+        let has_thinking = content_blocks
+            .iter()
+            .any(|b| matches!(b, messages::ContentBlock::Thinking { .. }));
+        Metrics::record_thinking_response(
+            &dispatch.model,
+            metrics_labels::ENDPOINT_MESSAGES,
+            has_thinking,
+        );
 
         // Step 6: Build Message
         Ok(Message {

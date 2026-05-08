@@ -492,6 +492,10 @@ struct CliArgs {
     #[arg(long, default_value_t = false, help_heading = "Logging")]
     enable_message_hash: bool,
 
+    /// Log non-prompt request parameters at HTTP middleware level (excludes messages/prompt/input)
+    #[arg(long, default_value_t = false, help_heading = "Logging")]
+    log_request_params: bool,
+
     /// Enable WebAssembly support
     #[arg(long, default_value_t = false, help_heading = "Backend")]
     enable_wasm: bool,
@@ -1254,6 +1258,7 @@ impl CliArgs {
             .retries(!self.disable_retries)
             .circuit_breaker(!self.disable_circuit_breaker)
             .enable_message_hash(self.enable_message_hash)
+            .log_request_params(self.log_request_params)
             .enable_wasm(self.enable_wasm)
             .maybe_storage_hook_wasm_path(self.storage_hook_wasm_path.as_deref())
             .igw(self.enable_igw)

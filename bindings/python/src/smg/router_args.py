@@ -121,6 +121,8 @@ class RouterArgs:
     backend: str = "sglang"
     # Message hash logging for session reconstruction
     enable_message_hash: bool = False
+    # Log non-prompt request parameters at HTTP middleware level
+    log_request_params: bool = False
     # Storage hooks (WASM)
     storage_hook_wasm_path: str | None = None
     # History backend configuration
@@ -479,6 +481,12 @@ class RouterArgs:
             action="store_true",
             default=RouterArgs.enable_message_hash,
             help="Compute per-message SHA-256 hashes for session reconstruction logging",
+        )
+        logging_group.add_argument(
+            f"--{prefix}log-request-params",
+            action="store_true",
+            default=RouterArgs.log_request_params,
+            help="Log non-prompt request parameters at HTTP middleware level (excludes messages/prompt/input)",
         )
 
         # Service discovery configuration
