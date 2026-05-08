@@ -1135,6 +1135,9 @@ pub fn build_app(
             app_state.context.inflight_tracker.clone(),
         ))
         .layer(middleware::RequestIdLayer::new(request_id_headers))
+        .layer(middleware::RequestParamLogLayer::new(
+            app_state.context.router_config.log_request_params,
+        ))
         .layer(create_cors_layer(cors_allowed_origins))
         .fallback(sink_handler)
         .with_state(app_state)

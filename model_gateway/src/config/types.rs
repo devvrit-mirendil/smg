@@ -105,7 +105,7 @@ pub struct RouterConfig {
     /// Compute per-message SHA-256 hashes for session reconstruction logging
     #[serde(default)]
     pub enable_message_hash: bool,
-    /// Log non-prompt request parameters (sampling config, tools, format) at INFO level
+    /// Log non-prompt request parameters at HTTP middleware level
     #[serde(default)]
     pub log_request_params: bool,
     /// Enable WASM support

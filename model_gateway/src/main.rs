@@ -492,7 +492,7 @@ struct CliArgs {
     #[arg(long, default_value_t = false, help_heading = "Logging")]
     enable_message_hash: bool,
 
-    /// Log non-prompt request parameters (sampling config, tools, response format) at INFO level
+    /// Log non-prompt request parameters at HTTP middleware level (excludes messages/prompt/input)
     #[arg(long, default_value_t = false, help_heading = "Logging")]
     log_request_params: bool,
 

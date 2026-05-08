@@ -9,6 +9,7 @@ pub mod concurrency;
 pub mod logging;
 pub mod metrics;
 pub mod request_id;
+pub mod request_params;
 pub mod storage_context;
 pub mod token_bucket;
 pub mod wasm;
@@ -20,6 +21,7 @@ pub use concurrency::{
 pub use logging::{create_logging_layer, RequestLogger, RequestSpan, ResponseLogger};
 pub use metrics::{HttpMetricsLayer, HttpMetricsMiddleware};
 pub use request_id::{RequestId, RequestIdLayer, RequestIdMiddleware};
+pub use request_params::RequestParamLogLayer;
 pub use storage_context::storage_context_middleware;
 pub use token_bucket::TokenBucket;
 pub use wasm::wasm_middleware;

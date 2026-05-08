@@ -224,6 +224,7 @@ impl StreamingProcessor {
         // Parser state (lazy initialization per index)
         type PooledReasoningParser = Arc<tokio::sync::Mutex<Box<dyn ReasoningParser>>>;
         let mut reasoning_parsers: HashMap<u32, PooledReasoningParser> = HashMap::new();
+        let mut has_reasoning_content: HashMap<u32, bool> = HashMap::new();
 
         type PooledToolParser = Arc<tokio::sync::Mutex<Box<dyn ToolParser>>>;
         let mut tool_parsers: HashMap<u32, PooledToolParser> = HashMap::new();
@@ -406,6 +407,7 @@ impl StreamingProcessor {
                             )
                             .await;
                         if let Some(chunk) = reasoning_chunk {
+                            has_reasoning_content.insert(index, true);
                             Self::format_sse_chunk_into(&mut sse_buffer, &chunk);
                             tx.send(Ok(Bytes::from(sse_buffer.clone())))
                                 .map_err(|_| "Failed to send reasoning chunk".to_string())?;
@@ -643,6 +645,10 @@ impl StreamingProcessor {
                 .map_err(|e| format!("Failed to serialize finish chunk: {e}"))?;
             tx.send(Ok(Bytes::from(format!("data: {sse_chunk}\n\n"))))
                 .map_err(|_| "Failed to send finish chunk".to_string())?;
+
+            // Record thinking metric per choice
+            let has_thinking = has_reasoning_content.get(index).copied().unwrap_or(false);
+            Metrics::record_thinking_response(model, metrics_labels::ENDPOINT_CHAT, has_thinking);
         }
 
         // Phase 5: Usage chunk

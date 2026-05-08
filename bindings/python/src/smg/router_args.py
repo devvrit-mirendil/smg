@@ -121,7 +121,7 @@ class RouterArgs:
     backend: str = "sglang"
     # Message hash logging for session reconstruction
     enable_message_hash: bool = False
-    # Log non-prompt request parameters at INFO level
+    # Log non-prompt request parameters at HTTP middleware level
     log_request_params: bool = False
     # Storage hooks (WASM)
     storage_hook_wasm_path: str | None = None
@@ -486,7 +486,7 @@ class RouterArgs:
             f"--{prefix}log-request-params",
             action="store_true",
             default=RouterArgs.log_request_params,
-            help="Log non-prompt request parameters (sampling config, tools, response format) at INFO level",
+            help="Log non-prompt request parameters at HTTP middleware level (excludes messages/prompt/input)",
         )
 
         # Service discovery configuration

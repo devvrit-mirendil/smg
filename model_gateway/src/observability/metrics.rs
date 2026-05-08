@@ -331,6 +331,12 @@ pub(crate) fn init_metrics() {
     );
     describe_counter!("smg_db_items_stored", "Total items stored by storage_type");
 
+    // Layer 7: Response content metrics
+    describe_counter!(
+        "smg_response_thinking_total",
+        "Responses by whether they included reasoning/thinking content"
+    );
+
     // Initialize mesh metrics
     smg_mesh::init_mesh_metrics();
 }
@@ -1180,6 +1186,22 @@ impl Metrics {
         counter!(
             "smg_db_items_stored",
             "storage_type" => storage_type
+        )
+        .increment(1);
+    }
+
+    // ========================================================================
+    // Layer 7: Response content metrics
+    // ========================================================================
+
+    /// Record whether a completed response included reasoning/thinking content.
+    pub fn record_thinking_response(model_id: &str, endpoint: &'static str, has_thinking: bool) {
+        let model = intern_string(model_id);
+        counter!(
+            "smg_response_thinking_total",
+            "model" => model,
+            "endpoint" => endpoint,
+            "has_thinking" => bool_to_static_str(has_thinking),
         )
         .increment(1);
     }
