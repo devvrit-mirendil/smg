@@ -387,8 +387,18 @@ impl StreamingProcessor {
                     let mut delta = chunk_text;
                     stream_buffer.push_str(&delta);
 
-                    // Reasoning content handling
-                    let in_reasoning = if separate_reasoning && reasoning_parser_available {
+                    // Skip reasoning parser when response_format is set:
+                    // engine emits constrained JSON, parser would otherwise
+                    // double-emit it as reasoning AND content (always_in_reasoning
+                    // parsers like minimax).
+                    let skip_reasoning_for_json = matches!(
+                        &original_request.response_format,
+                        Some(ResponseFormat::JsonObject) | Some(ResponseFormat::JsonSchema { .. })
+                    );
+                    let in_reasoning = if separate_reasoning
+                        && reasoning_parser_available
+                        && !skip_reasoning_for_json
+                    {
                         let (normal_text, reasoning_chunk, in_reasoning) = self
                             .process_reasoning_stream(
                                 &delta,
@@ -472,7 +482,8 @@ impl StreamingProcessor {
                         }
                     }
 
-                    // Strip leaked chatml/think tokens when a parser is configured
+                    // Strip leaked control tokens when a model-specific parser is configured.
+                    // \x02/\x03 are raw EOS bytes minimax constrained decoding sometimes leaks.
                     let mut delta = delta;
                     if self.configured_tool_parser.is_some()
                         || self.configured_reasoning_parser.is_some()
@@ -481,6 +492,7 @@ impl StreamingProcessor {
                             "<|im_end|>", "<|im_start|>", "<|im_user|>",
                             "<|im_assistant|>", "<|im_system|>", "<|im_middle|>",
                             "</think>", "[EOS]", "[BOS]",
+                            "\x02", "\x03",
                         ] {
                             delta = delta.replace(token, "");
                         }

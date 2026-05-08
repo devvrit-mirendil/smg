@@ -196,24 +196,38 @@ impl ResponseProcessor {
                     &original_request.model,
                     history_tool_calls_count,
                 );
-            } else if tool_parser_available {
-                (tool_calls, processed_text) = self
-                    .parse_tool_calls(
-                        &processed_text,
-                        &original_request.model,
-                        history_tool_calls_count,
-                        original_request.tools.as_deref(),
-                    )
-                    .await;
+            }
 
-                // Fallback: if reasoning consumed everything and tool parsing
-                // found nothing, re-attempt tool parsing on the reasoning text.
-                // Models sometimes embed tool calls inside <think> blocks.
-                if tool_calls.is_none() && processed_text.is_empty() {
-                    if let Some(ref reasoning) = reasoning_text {
+            // Fallback: always_in_reasoning parsers (MiniMax) swallow
+            // tool markup as <think>; specific-function constrained
+            // decoding emits raw JSON that the reasoning parser captures.
+            // Re-parse `reasoning_text` after stripping raw EOS bytes
+            // (\x02/\x03) and clear it on success so we don't double-expose.
+            if tool_calls.is_none() && processed_text.is_empty() {
+                if let Some(cleaned) = reasoning_text.as_ref().map(|r| {
+                    r.replace('\u{0002}', "")
+                        .replace('\u{0003}', "")
+                        .trim()
+                        .to_string()
+                }) {
+                    let mut consumed_reasoning = false;
+                    if used_json_schema {
+                        let (fallback_tc, remaining) = utils::parse_json_schema_response(
+                            &cleaned,
+                            original_request.tool_choice.as_ref(),
+                            &original_request.model,
+                            history_tool_calls_count,
+                        );
+                        if fallback_tc.is_some() {
+                            tool_calls = fallback_tc;
+                            processed_text = remaining;
+                            consumed_reasoning = true;
+                        }
+                    }
+                    if tool_calls.is_none() && tool_parser_available {
                         let (fallback_tc, remaining) = self
                             .parse_tool_calls(
-                                reasoning,
+                                &cleaned,
                                 &original_request.model,
                                 history_tool_calls_count,
                                 original_request.tools.as_deref(),
@@ -222,7 +236,11 @@ impl ResponseProcessor {
                         if fallback_tc.is_some() {
                             tool_calls = fallback_tc;
                             processed_text = remaining;
+                            consumed_reasoning = true;
                         }
+                    }
+                    if consumed_reasoning {
+                        reasoning_text = None;
                     }
                 }
             }
