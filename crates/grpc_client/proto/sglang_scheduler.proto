@@ -94,6 +94,11 @@ message DisaggregatedParams {
 }
 
 // =====================
+message MessageHash {
+  string role = 1;
+  string hash = 2;
+}
+
 // Generate Request
 // =====================
 
@@ -137,6 +142,9 @@ message GenerateRequest {
 
   // Whether client wants streaming response
   bool stream = 17;
+
+  // Per-message hashes for traffic replay/session reconstruction.
+  repeated MessageHash message_hashes = 18;
 }
 
 message TokenizedInput {

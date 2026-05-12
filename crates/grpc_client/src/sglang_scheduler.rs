@@ -335,6 +335,7 @@ impl SglangSchedulerClient {
         token_ids: Vec<u32>,
         multimodal_inputs: Option<proto::MultimodalInputs>,
         tool_call_constraint: Option<(String, String)>, // (constraint_type, constraint_value)
+        message_hashes: Option<Vec<(String, String)>>,
     ) -> Result<proto::GenerateRequest, String> {
         // Build sampling params
         let sampling_params =
@@ -353,6 +354,11 @@ impl SglangSchedulerClient {
             top_logprobs_num: body.top_logprobs.unwrap_or(0) as i32,
             return_hidden_states: body.return_hidden_states,
             stream: body.stream,
+            message_hashes: message_hashes
+                .unwrap_or_default()
+                .into_iter()
+                .map(|(role, hash)| proto::MessageHash { role, hash })
+                .collect(),
             ..Default::default()
         };
 

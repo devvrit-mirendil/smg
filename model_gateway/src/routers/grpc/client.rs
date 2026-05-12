@@ -340,6 +340,7 @@ impl GrpcClient {
                     token_ids,
                     sglang_mm,
                     tool_constraints,
+                    message_hashes,
                 )?;
                 Ok(ProtoGenerateRequest::Sglang(Box::new(req)))
             }

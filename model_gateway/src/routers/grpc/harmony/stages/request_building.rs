@@ -141,6 +141,7 @@ impl PipelineStage for HarmonyRequestBuildingStage {
                                 token_ids,
                                 None,
                                 tool_constraints,
+                                message_hashes.clone(),
                             )
                             .map_err(|e| {
                                 error!(function = "HarmonyRequestBuildingStage::execute", error = %e, "Failed to build SGLang generate request");
