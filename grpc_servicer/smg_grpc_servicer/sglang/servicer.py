@@ -450,7 +450,7 @@ class SGLangSchedulerServicer(sglang_scheduler_pb2_grpc.SglangSchedulerServicer)
                     preferred = json.loads(preferred)
                 except json.JSONDecodeError:
                     logger.warning("Failed to parse preferred_sampling_params JSON")
-                    preferred = {}
+                    preferred = None
             if isinstance(preferred, dict):
                 defaults.update(preferred)
             else:
@@ -468,7 +468,7 @@ class SGLangSchedulerServicer(sglang_scheduler_pb2_grpc.SglangSchedulerServicer)
             return json.dumps(preferred, separators=(",", ":"))
         if isinstance(preferred, str):
             return preferred
-        return ""
+        return json.dumps(preferred, separators=(",", ":")) if preferred else ""
 
     async def GetModelInfo(
         self,
@@ -518,9 +518,9 @@ class SGLangSchedulerServicer(sglang_scheduler_pb2_grpc.SglangSchedulerServicer)
         def make_serializable(obj):
             if obj is None:
                 return None
-            elif isinstance(obj, (str, int, float, bool)):
+            elif isinstance(obj, str | int | float | bool):
                 return obj
-            elif isinstance(obj, (list, tuple, set)):
+            elif isinstance(obj, list | tuple | set):
                 return [make_serializable(item) for item in obj]
             elif isinstance(obj, dict):
                 return {k: make_serializable(v) for k, v in obj.items()}
